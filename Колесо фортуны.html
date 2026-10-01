@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Колесо фортуны</title>
+<style>
+:root{--bg:#fff7ec;--fg:#2b1d3a;--card:#fff;--ac:#e8453c;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1c1428;--fg:#f6ecff;--card:#2a1e3b}}
+:root[data-theme="dark"]{--bg:#1c1428;--fg:#f6ecff;--card:#2a1e3b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;text-align:center;padding:16px}
+h1{margin:8px 0 12px;font-size:1.6rem}
+#box{position:relative;width:min(92vw,460px);margin:0 auto}
+canvas{width:100%;height:auto;display:block}
+#ptr{position:absolute;left:50%;top:-4px;width:0;height:0;transform:translateX(-50%);border-left:16px solid transparent;border-right:16px solid transparent;border-top:34px solid var(--fg);filter:drop-shadow(0 2px 2px rgba(0,0,0,.4))}
+button{font:inherit;font-weight:700;border:0;border-radius:999px;padding:14px 40px;margin:18px 6px 6px;background:var(--ac);color:#fff;cursor:pointer;font-size:1.1rem}
+button:disabled{opacity:.5}
+button.s{background:var(--card);color:var(--fg);padding:10px 20px;font-size:.9rem;border:1px solid #8884}
+#res{min-height:64px;margin:10px auto;font-size:1.9rem;font-weight:800}
+label{font-size:.95rem;display:block;margin-top:6px}
+</style>
+</head>
+<body>
+<h1>🎡 Колесо фортуны</h1>
+<div id="box"><canvas id="c"></canvas><div id="ptr"></div></div>
+<button id="go">Айналдыру / Крутить</button>
+<div id="res"></div>
+<label><input type="checkbox" id="rm"> Убирать победителя из колеса</label>
+<button class="s" id="reset">Сбросить имена</button>
+<script>
+const ALL=["Аружан","Айару","Гүлзара","Сабина","Алихан","Арияна","Әдия","Ернұр","Каусар","Нұрсұлтан","Нұрсая","Алишер","Нұрислам","Тәңіржан","Алина"];
+let names=ALL.slice(),rot=0,busy=false;
+const cv=document.getElementById("c"),ctx=cv.getContext("2d");
+const go=document.getElementById("go"),res=document.getElementById("res");
+function rnd(n){ // unbiased crypto random int in [0,n)
+  const a=new Uint32Array(1),lim=Math.floor(4294967296/n)*n;
+  do{crypto.getRandomValues(a)}while(a[0]>=lim);
+  return a[0]%n;
+}
+function rf(){const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]/4294967296}
+function draw(){
+  const d=window.devicePixelRatio||1,S=Math.round(cv.clientWidth||460);
+  cv.width=cv.height=S*d;ctx.setTransform(d,0,0,d,0,0);ctx.clearRect(0,0,S,S);
+  const r=S/2-4,n=names.length,st=2*Math.PI/n;
+  ctx.save();ctx.translate(S/2,S/2);ctx.rotate(rot);
+  for(let i=0;i<n;i++){
+    ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,r,i*st,(i+1)*st);ctx.closePath();
+    ctx.fillStyle=`hsl(${(i*360/ALL.length*1.0+ALL.indexOf(names[i])*0)%360},75%,${i%2?55:62}%)`;
+    ctx.fillStyle=`hsl(${ALL.indexOf(names[i])*360/ALL.length},75%,58%)`;
+    ctx.fill();ctx.strokeStyle="#fff";ctx.lineWidth=2;ctx.stroke();
+    ctx.save();ctx.rotate(i*st+st/2);ctx.fillStyle="#fff";ctx.textAlign="right";ctx.textBaseline="middle";
+    ctx.font=`700 ${Math.max(12,Math.min(S/22,r*st*0.42))}px system-ui,sans-serif`;
+    ctx.shadowColor="rgba(0,0,0,.5)";ctx.shadowBlur=3;
+    ctx.fillText(names[i],r-14,0);ctx.restore();
+  }
+  ctx.restore();
+  ctx.beginPath();ctx.arc(S/2,S/2,S*0.05,0,7);ctx.fillStyle="#fff";ctx.fill();
+  ctx.strokeStyle="#0003";ctx.lineWidth=3;ctx.stroke();
+}
+go.onclick=()=>{
+  if(busy||names.length<1)return;
+  busy=true;go.disabled=true;res.textContent="";
+  const n=names.length,st=2*Math.PI/n,win=rnd(n);
+  const off=(rf()-0.5)*st*0.8;
+  const tau=2*Math.PI,mod=x=>((x%tau)+tau)%tau;
+  const want=mod(-Math.PI/2-(win*st+st/2+off));
+  const delta=mod(want-mod(rot))+tau*(5+rnd(4));
+  const start=rot,dur=5000+rnd(1500),t0=performance.now();
+  (function f(t){
+    const p=Math.min(1,(t-t0)/dur),e=1-Math.pow(1-p,4);
+    rot=start+delta*e;draw();
+    if(p<1)return requestAnimationFrame(f);
+    busy=false;go.disabled=false;
+    res.textContent="🎉 "+names[win];
+    if(document.getElementById("rm").checked&&names.length>1){names.splice(win,1);setTimeout(draw,1200)}
+  })(t0);
+};
+document.getElementById("reset").onclick=()=>{if(busy)return;names=ALL.slice();res.textContent="";draw()};
+addEventListener("resize",draw);draw();
+</script>
+</body>
+</html>
